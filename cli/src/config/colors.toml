@@ -16,6 +16,7 @@
 
 # Unique prefixes and the rest for change & commit ids
 "prefix" = { bold = true }
+"prefix_highlight" = { bold = true, fg = "red" }
 "rest" = "bright black"
 "mutable divergent rest" = "red"
 "mutable divergent prefix" = { fg = "red", underline = true }

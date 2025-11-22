@@ -2044,7 +2044,10 @@ where
                 let prefix_len = id.shortest_prefix_len(repo, &index)?;
                 let mut hex = format!("{id:.len$}", len = max(prefix_len, len.unwrap_or(0)));
                 let rest = hex.split_off(prefix_len);
-                Ok(ShortestIdPrefix { prefix: hex, rest })
+                // Get the Commit object to determine if we need to highlight the
+                // prefix.
+                let highlight = false;
+                Ok(ShortestIdPrefix { prefix: hex, rest, highlight })
             });
             Ok(out_property.into_dyn_wrapped())
         },
@@ -2056,11 +2059,16 @@ where
 pub struct ShortestIdPrefix {
     pub prefix: String,
     pub rest: String,
+    pub highlight: bool,
 }
 
 impl Template for ShortestIdPrefix {
     fn format(&self, formatter: &mut TemplateFormatter) -> io::Result<()> {
-        write!(formatter.labeled("prefix"), "{}", self.prefix)?;
+        if self.highlight {
+            write!(formatter.labeled("prefix_highlight"), "{}", self.prefix)?;
+        } else {
+            write!(formatter.labeled("prefix"), "{}", self.prefix)?;
+        }
         write!(formatter.labeled("rest"), "{}", self.rest)?;
         Ok(())
     }
@@ -2071,12 +2079,14 @@ impl ShortestIdPrefix {
         Self {
             prefix: self.prefix.to_ascii_uppercase(),
             rest: self.rest.to_ascii_uppercase(),
+            highlight: self.highlight,
         }
     }
     fn to_lower(&self) -> Self {
         Self {
             prefix: self.prefix.to_ascii_lowercase(),
             rest: self.rest.to_ascii_lowercase(),
+            highlight: self.highlight,
         }
     }
 }
