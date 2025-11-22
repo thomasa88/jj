@@ -109,7 +109,7 @@ impl GraphStyle {
     }
 }
 
-pub fn get_graphlog<'a, K: Clone + Eq + Hash + 'a>(
+pub fn get_graphlog<'a, K: Clone + Eq + Hash + std::fmt::Debug + 'a>(
     style: GraphStyle,
     formatter: &'a mut dyn Write,
 ) -> Box<dyn GraphLog<K> + 'a> {
