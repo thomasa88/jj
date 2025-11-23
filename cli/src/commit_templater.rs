@@ -960,7 +960,15 @@ fn builtin_commit_methods<'repo>() -> CommitTemplateBuildMethodFnMap<'repo, Comm
         "description",
         |_language, _diagnostics, _build_ctx, self_property, function| {
             function.expect_no_arguments()?;
-            let out_property = self_property.map(|commit| commit.description().to_owned());
+            let out_property = self_property.map(|commit| {
+                let mut desc = commit.description().to_owned();
+                // Put a separating blank line at the end if the description is
+                // multi-line.
+                if desc.chars().filter(|c| *c == '\n').take(2).count() == 2 {
+                    desc.push('\n');
+                }
+                desc
+            });
             Ok(out_property.into_dyn_wrapped())
         },
     );
@@ -2047,7 +2055,11 @@ where
                 // Get the Commit object to determine if we need to highlight the
                 // prefix.
                 let highlight = false;
-                Ok(ShortestIdPrefix { prefix: hex, rest, highlight })
+                Ok(ShortestIdPrefix {
+                    prefix: hex,
+                    rest,
+                    highlight,
+                })
             });
             Ok(out_property.into_dyn_wrapped())
         },
