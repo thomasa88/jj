@@ -210,7 +210,7 @@ pub(crate) fn cmd_log(
                 }
             };
             for node in iter {
-                let (commit_id, edges) = node?;
+                let ((commit_id, edges), color) = node?;
 
                 // The graph is keyed by (CommitId, is_synthetic)
                 let mut graphlog_edges = vec![];
@@ -266,7 +266,9 @@ pub(crate) fn cmd_log(
 
                 let commit = Some(commit);
                 let node_symbol = format_template(ui, &commit, &node_template);
-                graph.add_node(
+                // node_symbol.push_str(&color.unwrap_or_default().to_string());
+                let node_symbol = format!("\x1b[38;5;{color}m{node_symbol}\x1b[0m", color = color.unwrap_or(0) % 15 );
+                graph.add_node(/////////is this rendering the node? yes!
                     &key,
                     &graphlog_edges,
                     &node_symbol,
@@ -288,6 +290,9 @@ pub(crate) fn cmd_log(
                         writeln!(formatter.labeled("elided"), "(elided revisions)")
                     })?;
                     let node_symbol = format_template(ui, &None, &node_template);
+                    let node_symbol = format!("\x1b[38;5;{color}m{node_symbol}\x1b[0m", color = color.unwrap_or(0) % 15 );
+
+
                     graph.add_node(
                         &elided_key,
                         &edges,

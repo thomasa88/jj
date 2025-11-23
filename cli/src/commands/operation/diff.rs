@@ -194,7 +194,7 @@ pub fn show_op_diff(
             let mut graph = get_graphlog(graph_style, raw_output.as_mut());
             let graph_iter = TopoGroupedGraphIterator::new(revset.iter_graph(), |id| id);
             for node in graph_iter {
-                let (commit_id, mut edges) = node?;
+                let ((commit_id, mut edges), _) = node?;
                 let modified_change = changes.get(&commit_id).unwrap();
                 // Omit "missing" edge to keep the graph concise.
                 edges.retain(|edge| !edge.is_missing());

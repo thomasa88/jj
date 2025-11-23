@@ -25,6 +25,8 @@ use std::hash::Hash;
 /// clone. There should be a pure `(&N) -> &ID` function.
 pub type GraphNode<N, ID = N> = (N, Vec<GraphEdge<ID>>);
 
+pub type Color = u32;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct GraphEdge<N> {
     pub target: N,
@@ -89,26 +91,26 @@ fn reachable_targets<N>(edges: &[GraphEdge<N>]) -> impl DoubleEndedIterator<Item
 
 /// Creates new graph in which nodes and edges are reversed.
 pub fn reverse_graph<N, ID: Clone + Eq + Hash, E>(
-    input: impl Iterator<Item = Result<GraphNode<N, ID>, E>>,
+    input: impl Iterator<Item = Result<(GraphNode<N, ID>, Option<Color>), E>>,
     as_id: impl Fn(&N) -> &ID,
-) -> Result<Vec<GraphNode<N, ID>>, E> {
+) -> Result<Vec<(GraphNode<N, ID>, Option<Color>)>, E> {
     let mut entries = vec![];
     let mut reverse_edges: HashMap<ID, Vec<GraphEdge<ID>>> = HashMap::new();
     for item in input {
-        let (node, edges) = item?;
+        let ((node, edges), color) = item?;
         for GraphEdge { target, edge_type } in edges {
             reverse_edges.entry(target).or_default().push(GraphEdge {
                 target: as_id(&node).clone(),
                 edge_type,
             });
         }
-        entries.push(node);
+        entries.push((node, color));
     }
 
     let mut items = vec![];
-    for node in entries.into_iter().rev() {
+    for (node, color) in entries.into_iter().rev() {
         let edges = reverse_edges.remove(as_id(&node)).unwrap_or_default();
-        items.push((node, edges));
+        items.push(((node, edges), color));
     }
     Ok(items)
 }
@@ -138,6 +140,7 @@ pub struct TopoGroupedGraphIterator<N, ID, I, F> {
     new_head_ids: VecDeque<ID>,
     /// Set of nodes which may be ancestors of `new_head_ids`.
     blocked_ids: HashSet<ID>,
+    next_color: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -147,6 +150,7 @@ struct TopoGroupedGraphNode<N, ID> {
     /// Graph node data and edges to parent nodes. `None` until this node is
     /// populated.
     item: Option<GraphNode<N, ID>>,
+    color: Option<Color>,
 }
 
 impl<N, ID> Default for TopoGroupedGraphNode<N, ID> {
@@ -154,6 +158,7 @@ impl<N, ID> Default for TopoGroupedGraphNode<N, ID> {
         Self {
             child_ids: Default::default(),
             item: None,
+            color: None,
         }
     }
 }
@@ -174,6 +179,7 @@ where
             emittable_ids: Vec::new(),
             new_head_ids: VecDeque::new(),
             blocked_ids: HashSet::new(),
+            next_color: 0,
         }
     }
 
@@ -194,7 +200,7 @@ where
     }
 
     fn populate_one(&mut self) -> Result<Option<()>, E> {
-        let item = match self.input_iter.next() {
+        let mut item = match self.input_iter.next() {
             Some(Ok(item)) => item,
             Some(Err(err)) => {
                 return Err(err);
@@ -203,23 +209,42 @@ where
                 return Ok(None);
             }
         };
-        let (data, edges) = &item;
+        let (data, edges) = &mut item;
         let current_id = (self.as_id)(data);
 
+        let mut color = None;
+        if let Some(current_node) = self.nodes.get_mut(current_id) {
+            color = current_node.color.clone();
+        }
+
+        if color.is_none() {
+            color.replace(self.next_color());
+        }
+
         // Set up reverse reference
+        let mut first_parent = true;
         for parent_id in reachable_targets(edges) {
             let parent_node = self.nodes.entry(parent_id.clone()).or_default();
             parent_node.child_ids.insert(current_id.clone());
+            if first_parent {
+                if parent_node.color.is_none() {
+                    parent_node.color = color.clone();
+                }
+
+                first_parent = false;
+            }
         }
 
         // Populate the current node
         if let Some(current_node) = self.nodes.get_mut(current_id) {
             assert!(current_node.item.is_none());
             current_node.item = Some(item);
+            current_node.color = color;
         } else {
             let current_id = current_id.clone();
             let current_node = TopoGroupedGraphNode {
                 item: Some(item),
+                color: color,
                 ..Default::default()
             };
             self.nodes.insert(current_id.clone(), current_node);
@@ -228,6 +253,12 @@ where
         }
 
         Ok(Some(()))
+    }
+
+    fn next_color(&mut self) -> u32 {
+        let color = self.next_color;
+        self.next_color += 1;
+        color
     }
 
     /// Enqueues the first new head which will unblock the waiting ancestors.
@@ -284,7 +315,7 @@ where
         self.emittable_ids.push(new_head_id);
     }
 
-    fn next_node(&mut self) -> Result<Option<GraphNode<N, ID>>, E> {
+    fn next_node(&mut self) -> Result<(Option<GraphNode<N, ID>>, Option<Color>), E> {
         // Based on Kahn's algorithm
         loop {
             if let Some(current_id) = self.emittable_ids.last() {
@@ -305,6 +336,9 @@ where
                         .expect("parent or prioritized node should exist");
                     continue;
                 };
+
+                let color = current_node.color;
+
                 // The second (or the last) parent will be visited first
                 let current_id = self.emittable_ids.pop().unwrap();
                 self.nodes.remove(&current_id).unwrap();
@@ -320,13 +354,13 @@ where
                         self.blocked_ids.insert(parent_id.clone());
                     }
                 }
-                return Ok(Some(item));
+                return Ok((Some(item), color));
             } else if !self.new_head_ids.is_empty() {
                 self.flush_new_head();
             } else {
                 // Populate the first or orphan head
                 if self.populate_one()?.is_none() {
-                    return Ok(None);
+                    return Ok((None, None));
                 }
             }
         }
@@ -339,12 +373,12 @@ where
     I: Iterator<Item = Result<GraphNode<N, ID>, E>>,
     F: Fn(&N) -> &ID,
 {
-    type Item = Result<GraphNode<N, ID>, E>;
+    type Item = Result<(GraphNode<N, ID>, Option<Color>), E>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_node() {
-            Ok(Some(node)) => Some(Ok(node)),
-            Ok(None) => {
+            Ok((Some(node), color)) => Some(Ok((node, color))),
+            Ok((None, _)) => {
                 assert!(self.nodes.is_empty(), "all nodes should have been emitted");
                 None
             }

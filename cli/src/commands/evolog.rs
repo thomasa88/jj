@@ -167,7 +167,7 @@ pub(crate) fn cmd_evolog(
         };
 
         for node in evolution_nodes {
-            let (entry, edges) = node?;
+            let ((entry, edges), _) = node?;
             let mut buffer = vec![];
             let within_graph =
                 with_content_format.sub_width(graph.width(entry.commit.id(), &edges));
