@@ -503,7 +503,7 @@ coalesce(
       if(current_working_copy, "@"),
       if(immutable, "◆"),
       if(conflict, "×"),
-      "○",
+      "⦿",
     )
   )
 )
@@ -531,7 +531,7 @@ coalesce(
 builtin_op_log_node = '''
 coalesce(
   if(current_operation, label("current_operation", "@")),
-  "○",
+  "⦿",
 )
 '''
 

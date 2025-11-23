@@ -224,7 +224,7 @@ pub fn show_op_diff(
                 }
 
                 // TODO: customize node symbol?
-                let node_symbol = "○";
+                let node_symbol = "⦿";
                 graph.add_node(
                     &commit_id,
                     &edges,
