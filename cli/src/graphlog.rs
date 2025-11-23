@@ -101,6 +101,7 @@ pub enum GraphStyle {
     AsciiLarge,
     Curved,
     Square,
+    PadBranch,
 }
 
 impl GraphStyle {
@@ -120,6 +121,9 @@ pub fn get_graphlog<'a, K: Clone + Eq + Hash + std::fmt::Debug + 'a>(
         GraphStyle::Curved => SaplingGraphLog::create(builder.build_box_drawing(), formatter),
         GraphStyle::Square => {
             SaplingGraphLog::create(builder.build_box_drawing().with_square_glyphs(), formatter)
+        }
+        GraphStyle::PadBranch => {
+            SaplingGraphLog::create(builder.build_box_drawing().with_branch_padding(), formatter)
         }
     }
 }
