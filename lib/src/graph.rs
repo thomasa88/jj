@@ -91,26 +91,26 @@ fn reachable_targets<N>(edges: &[GraphEdge<N>]) -> impl DoubleEndedIterator<Item
 
 /// Creates new graph in which nodes and edges are reversed.
 pub fn reverse_graph<N, ID: Clone + Eq + Hash, E>(
-    input: impl Iterator<Item = Result<(GraphNode<N, ID>, Option<Color>), E>>,
+    input: impl Iterator<Item = Result<(GraphNode<N, ID>, Option<Color>, bool), E>>,
     as_id: impl Fn(&N) -> &ID,
-) -> Result<Vec<(GraphNode<N, ID>, Option<Color>)>, E> {
+) -> Result<Vec<(GraphNode<N, ID>, Option<Color>, bool)>, E> {
     let mut entries = vec![];
     let mut reverse_edges: HashMap<ID, Vec<GraphEdge<ID>>> = HashMap::new();
     for item in input {
-        let ((node, edges), color) = item?;
+        let ((node, edges), color, is_head) = item?;
         for GraphEdge { target, edge_type } in edges {
             reverse_edges.entry(target).or_default().push(GraphEdge {
                 target: as_id(&node).clone(),
                 edge_type,
             });
         }
-        entries.push((node, color));
+        entries.push((node, color, is_head));
     }
 
     let mut items = vec![];
-    for (node, color) in entries.into_iter().rev() {
+    for (node, color, is_head) in entries.into_iter().rev() {
         let edges = reverse_edges.remove(as_id(&node)).unwrap_or_default();
-        items.push(((node, edges), color));
+        items.push(((node, edges), color, is_head));
     }
     Ok(items)
 }
@@ -151,6 +151,7 @@ struct TopoGroupedGraphNode<N, ID> {
     /// populated.
     item: Option<GraphNode<N, ID>>,
     color: Option<Color>,
+    is_head: bool,
 }
 
 impl<N, ID> Default for TopoGroupedGraphNode<N, ID> {
@@ -159,6 +160,7 @@ impl<N, ID> Default for TopoGroupedGraphNode<N, ID> {
             child_ids: Default::default(),
             item: None,
             color: None,
+            is_head: true,
         }
     }
 }
@@ -226,6 +228,7 @@ where
         for parent_id in reachable_targets(edges) {
             let parent_node = self.nodes.entry(parent_id.clone()).or_default();
             parent_node.child_ids.insert(current_id.clone());
+            parent_node.is_head = false;
             if first_parent {
                 if parent_node.color.is_none() {
                     parent_node.color = color.clone();
@@ -315,7 +318,7 @@ where
         self.emittable_ids.push(new_head_id);
     }
 
-    fn next_node(&mut self) -> Result<(Option<GraphNode<N, ID>>, Option<Color>), E> {
+    fn next_node(&mut self) -> Result<(Option<GraphNode<N, ID>>, Option<Color>, bool), E> {
         // Based on Kahn's algorithm
         loop {
             if let Some(current_id) = self.emittable_ids.last() {
@@ -338,6 +341,7 @@ where
                 };
 
                 let color = current_node.color;
+                let is_head = current_node.is_head;
 
                 // The second (or the last) parent will be visited first
                 let current_id = self.emittable_ids.pop().unwrap();
@@ -354,13 +358,13 @@ where
                         self.blocked_ids.insert(parent_id.clone());
                     }
                 }
-                return Ok((Some(item), color));
+                return Ok((Some(item), color, is_head));
             } else if !self.new_head_ids.is_empty() {
                 self.flush_new_head();
             } else {
                 // Populate the first or orphan head
                 if self.populate_one()?.is_none() {
-                    return Ok((None, None));
+                    return Ok((None, None, false));
                 }
             }
         }
@@ -373,12 +377,12 @@ where
     I: Iterator<Item = Result<GraphNode<N, ID>, E>>,
     F: Fn(&N) -> &ID,
 {
-    type Item = Result<(GraphNode<N, ID>, Option<Color>), E>;
+    type Item = Result<(GraphNode<N, ID>, Option<Color>, bool), E>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_node() {
-            Ok((Some(node), color)) => Some(Ok((node, color))),
-            Ok((None, _)) => {
+            Ok((Some(node), color, is_head)) => Some(Ok((node, color, is_head))),
+            Ok((None, _, _)) => {
                 assert!(self.nodes.is_empty(), "all nodes should have been emitted");
                 None
             }

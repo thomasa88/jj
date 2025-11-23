@@ -209,7 +209,7 @@ fn do_op_log(
             let op = op?;
             let ids = op.parent_ids();
             let edges = ids.iter().cloned().map(GraphEdge::direct).collect();
-            Ok(((op, edges), None))
+            Ok(((op, edges), None, false))
         });
         let iter_nodes: Box<dyn Iterator<Item = _>> = if args.reversed {
             Box::new(reverse_graph(iter, Operation::id)?.into_iter().map(Ok))
@@ -217,7 +217,7 @@ fn do_op_log(
             Box::new(iter)
         };
         for node in iter_nodes {
-            let ((op, edges), _) = node?;
+            let ((op, edges), _, _) = node?;
             let mut buffer = vec![];
             let within_graph = with_content_format.sub_width(graph.width(op.id(), &edges));
             within_graph.write(ui.new_formatter(&mut buffer).as_mut(), |formatter| {

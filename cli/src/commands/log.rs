@@ -165,6 +165,7 @@ pub(crate) fn cmd_log(
     let with_content_format = LogContentFormat::new(ui, settings)?;
 
     let template: TemplateRenderer<Commit>;
+    let head_template: TemplateRenderer<Commit>;
     let node_template: TemplateRenderer<Option<Commit>>;
     {
         let language = workspace_command.commit_template_language();
@@ -175,6 +176,9 @@ pub(crate) fn cmd_log(
         template = workspace_command
             .parse_template(ui, &language, &template_string)?
             .labeled(["log", "commit"]);
+        head_template = workspace_command
+            .parse_template(ui, &language, &template_string)?
+            .labeled(["log", "commit", "head"]);
         node_template = workspace_command
             .parse_template(ui, &language, &settings.get_string("templates.log_node")?)?
             .labeled(["log", "commit", "node"]);
@@ -210,7 +214,7 @@ pub(crate) fn cmd_log(
                 }
             };
             for node in iter {
-                let ((commit_id, edges), color) = node?;
+                let ((commit_id, edges), color, is_head) = node?;
 
                 // The graph is keyed by (CommitId, is_synthetic)
                 let mut graphlog_edges = vec![];
@@ -246,7 +250,7 @@ pub(crate) fn cmd_log(
                 let within_graph =
                     with_content_format.sub_width(graph.width(&key, &graphlog_edges));
                 within_graph.write(ui.new_formatter(&mut buffer).as_mut(), |formatter| {
-                    template.format(&commit, formatter)
+                    if is_head { &head_template } else { &template }.format(&commit, formatter)
                 })?;
                 if !buffer.ends_with(b"\n") {
                     buffer.push(b'\n');
@@ -267,8 +271,12 @@ pub(crate) fn cmd_log(
                 let commit = Some(commit);
                 let node_symbol = format_template(ui, &commit, &node_template);
                 // node_symbol.push_str(&color.unwrap_or_default().to_string());
-                let node_symbol = format!("\x1b[38;5;{color}m{node_symbol}\x1b[0m", color = color.unwrap_or(0) % 15 );
-                graph.add_node(/////////is this rendering the node? yes!
+                let node_symbol = format!(
+                    "\x1b[38;5;{color}m{node_symbol}\x1b[0m",
+                    color = color.unwrap_or(0) % 15
+                );
+                graph.add_node(
+                    /////////is this rendering the node? yes!
                     &key,
                     &graphlog_edges,
                     &node_symbol,
@@ -290,8 +298,10 @@ pub(crate) fn cmd_log(
                         writeln!(formatter.labeled("elided"), "(elided revisions)")
                     })?;
                     let node_symbol = format_template(ui, &None, &node_template);
-                    let node_symbol = format!("\x1b[38;5;{color}m{node_symbol}\x1b[0m", color = color.unwrap_or(0) % 15 );
-
+                    let node_symbol = format!(
+                        "\x1b[38;5;{color}m{node_symbol}\x1b[0m",
+                        color = color.unwrap_or(0) % 15
+                    );
 
                     graph.add_node(
                         &elided_key,
