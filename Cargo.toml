@@ -89,7 +89,7 @@ regex = "1.12.2"
 rpassword = "7.4.0"
 rustix = { version = "1.1.2", features = ["fs"] }
 same-file = "1.0.6"
-sapling-renderdag = { path = "sapling/eden/scm/lib/renderdag" }
+sapling-renderdag = { git = "https://github.com/thomasa88/sapling.git", branch = "box-drawing-branch-spacing" }
 sapling-streampager = "0.11.0"
 scm-record = "0.9.0"
 serde = { version = "1.0", features = ["derive", "rc"] }

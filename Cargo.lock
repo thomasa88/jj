@@ -3628,17 +3628,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "sapling-drawdag"
-version = "0.1.0"
-
-[[package]]
 name = "sapling-renderdag"
 version = "0.1.0"
+source = "git+https://github.com/thomasa88/sapling.git?branch=box-drawing-branch-spacing#fc64ca4a832795f7bcf39488abf856e7f98ee21f"
 dependencies = [
  "bitflags 2.9.1",
- "sapling-drawdag",
- "serde",
- "unicode-width 0.1.12",
 ]
 
 [[package]]
